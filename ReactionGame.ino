@@ -545,18 +545,170 @@ const RhythmNote PROGMEM song6_notes[] = {
 };
 #define SONG6_LEN 68
 
+// Song 8: Pirates of the Caribbean - He's a Pirate (Medium-Hard)
+const RhythmNote PROGMEM song7_notes[] = {
+  // Iconic opening: da da DA da da DA da da
+  {0, 1, NOTE_E4}, {150, 2, NOTE_G4}, {300, 3, NOTE_A4}, {500, 3, NOTE_A4},
+  {700, 3, NOTE_A4}, {850, 4, NOTE_B4}, {1000, 3, NOTE_A4}, {1150, 2, NOTE_G4},
+  {1300, 1, NOTE_E4}, {1500, 1, NOTE_E4}, {1700, 0, NOTE_D4}, {1900, 1, NOTE_E4},
+  // Second phrase
+  {2200, 1, NOTE_E4}, {2350, 2, NOTE_G4}, {2500, 3, NOTE_A4}, {2700, 3, NOTE_A4},
+  {2900, 3, NOTE_A4}, {3050, 4, NOTE_B4}, {3200, 4, NOTE_C5}, {3400, 4, NOTE_B4},
+  {3600, 3, NOTE_A4}, {3800, 2, NOTE_G4}, {4000, 3, NOTE_A4}, {4200, 1, NOTE_E4},
+  // Rising section
+  {4600, 0, NOTE_D4}, {4750, 1, NOTE_E4}, {4900, 2, NOTE_G4}, {5100, 2, NOTE_G4},
+  {5300, 2, NOTE_G4}, {5450, 3, NOTE_A4}, {5600, 2, NOTE_G4}, {5750, 1, NOTE_E4},
+  {5900, 0, NOTE_D4}, {6100, 0, NOTE_D4}, {6300, 1, NOTE_E4}, {6500, 0, NOTE_D4},
+  // Repeat main theme faster
+  {6800, 1, NOTE_E4}, {6950, 2, NOTE_G4}, {7100, 3, NOTE_A4}, {7250, 3, NOTE_A4},
+  {7400, 4, NOTE_B4}, {7550, 3, NOTE_A4}, {7700, 2, NOTE_G4}, {7850, 1, NOTE_E4},
+  {8000, 2, NOTE_G4}, {8150, 3, NOTE_A4}, {8300, 4, NOTE_B4}, {8450, 4, NOTE_C5},
+  // Dramatic ascending run
+  {8700, 0, NOTE_D4}, {8850, 1, NOTE_E4}, {9000, 2, NOTE_G4}, {9150, 3, NOTE_A4},
+  {9300, 4, NOTE_B4}, {9500, 4, NOTE_C5}, {9700, 4, NOTE_D5}, {9900, 3, NOTE_C5},
+  {10100, 2, NOTE_A4}, {10300, 1, NOTE_G4}, {10500, 2, NOTE_A4}, {10700, 1, NOTE_E4},
+  // Final phrase
+  {11000, 3, NOTE_A4}, {11150, 3, NOTE_A4}, {11300, 4, NOTE_B4}, {11500, 3, NOTE_A4},
+  {11700, 2, NOTE_G4}, {11900, 1, NOTE_E4}, {12100, 0, NOTE_D4}, {12400, 1, NOTE_E4},
+  {12700, 3, NOTE_A4},
+};
+#define SONG7_LEN 65
+
+// Song 9: Jaws Theme (Easy) - 2-note terror
+const RhythmNote PROGMEM song8_notes[] = {
+  // The iconic E-F pattern, starts slow, gets faster
+  {0, 0, NOTE_E3}, {1000, 1, NOTE_F3},
+  {2000, 0, NOTE_E3}, {2900, 1, NOTE_F3},
+  {3700, 0, NOTE_E3}, {4400, 1, NOTE_F3},
+  {5000, 0, NOTE_E3}, {5500, 1, NOTE_F3},
+  // Getting faster
+  {6000, 0, NOTE_E3}, {6400, 1, NOTE_F3},
+  {6800, 0, NOTE_E3}, {7150, 1, NOTE_F3},
+  {7500, 0, NOTE_E3}, {7800, 1, NOTE_F3},
+  {8100, 0, NOTE_E3}, {8350, 1, NOTE_F3},
+  // Fast now - shark approaching
+  {8600, 0, NOTE_E3}, {8800, 1, NOTE_F3},
+  {9000, 0, NOTE_E3}, {9200, 1, NOTE_F3},
+  {9400, 0, NOTE_E3}, {9550, 1, NOTE_F3},
+  {9700, 0, NOTE_E3}, {9850, 1, NOTE_F3},
+  // Frantic
+  {10000, 0, NOTE_E3}, {10120, 1, NOTE_F3},
+  {10240, 0, NOTE_E3}, {10360, 1, NOTE_F3},
+  {10480, 0, NOTE_E3}, {10600, 1, NOTE_F3},
+  {10720, 0, NOTE_E3}, {10840, 1, NOTE_F3},
+  // ATTACK! Big ascending stabs
+  {11100, 2, NOTE_G4}, {11250, 3, NOTE_A4}, {11400, 4, NOTE_B4},
+  {11600, 4, NOTE_C5}, {11800, 4, NOTE_D5}, {12000, 4, NOTE_E5},
+  // Calm after the storm
+  {12500, 0, NOTE_E3}, {13000, 1, NOTE_F3},
+  {13500, 0, NOTE_E3}, {14000, 1, NOTE_F3},
+  {14500, 0, NOTE_E3},
+};
+#define SONG8_LEN 43
+
+// Song 10: Never Gonna Give You Up - Rick Astley (Medium)
+const RhythmNote PROGMEM song9_notes[] = {
+  // Intro riff - iconic synth hook
+  {0, 0, NOTE_D4}, {200, 1, NOTE_E4}, {400, 2, NOTE_G4}, {600, 1, NOTE_E4},
+  {800, 4, NOTE_B4}, {1000, 4, NOTE_B4}, {1400, 3, NOTE_A4},
+  // Repeat hook
+  {1800, 0, NOTE_D4}, {2000, 1, NOTE_E4}, {2200, 2, NOTE_G4}, {2400, 1, NOTE_E4},
+  {2600, 3, NOTE_A4}, {2800, 3, NOTE_A4}, {3200, 2, NOTE_G4}, {3400, 1, NOTE_E4},
+  // "Never gonna give you up"
+  {3800, 2, NOTE_G4}, {4000, 3, NOTE_A4}, {4200, 2, NOTE_G4}, {4400, 1, NOTE_E4},
+  {4600, 0, NOTE_D4}, {4900, 0, NOTE_D4}, {5200, 1, NOTE_E4}, {5400, 2, NOTE_G4},
+  // "Never gonna let you down"
+  {5800, 2, NOTE_G4}, {6000, 3, NOTE_A4}, {6200, 4, NOTE_B4}, {6400, 3, NOTE_A4},
+  {6600, 2, NOTE_G4}, {6900, 1, NOTE_E4}, {7200, 0, NOTE_D4},
+  // "Never gonna run around and desert you"
+  {7600, 0, NOTE_D4}, {7800, 1, NOTE_E4}, {8000, 2, NOTE_G4}, {8200, 1, NOTE_E4},
+  {8400, 3, NOTE_A4}, {8600, 2, NOTE_G4}, {8800, 1, NOTE_E4}, {9000, 0, NOTE_D4},
+  {9200, 1, NOTE_E4}, {9400, 2, NOTE_G4}, {9600, 3, NOTE_A4},
+  // Chorus repeat
+  {10000, 0, NOTE_D4}, {10200, 1, NOTE_E4}, {10400, 2, NOTE_G4}, {10600, 1, NOTE_E4},
+  {10800, 4, NOTE_B4}, {11000, 4, NOTE_B4}, {11400, 3, NOTE_A4},
+  // Second verse melody
+  {11800, 2, NOTE_G4}, {12000, 3, NOTE_A4}, {12200, 2, NOTE_G4}, {12400, 1, NOTE_E4},
+  {12600, 0, NOTE_D4}, {12900, 0, NOTE_D4}, {13200, 1, NOTE_E4}, {13400, 2, NOTE_G4},
+  {13600, 2, NOTE_G4}, {13800, 3, NOTE_A4}, {14000, 4, NOTE_B4}, {14200, 3, NOTE_A4},
+  {14400, 2, NOTE_G4}, {14700, 1, NOTE_E4}, {15000, 0, NOTE_D4},
+};
+#define SONG9_LEN 58
+
+// Song 11: Imperial March - Darth Vader (Medium)
+const RhythmNote PROGMEM song10_notes[] = {
+  // DUN DUN DUN DUN-DA-DUN DUN-DA-DUN
+  {0, 2, NOTE_G4}, {500, 2, NOTE_G4}, {1000, 2, NOTE_G4},
+  {1500, 0, NOTE_DS4}, {1750, 4, NOTE_AS4},
+  {2000, 2, NOTE_G4}, {2500, 0, NOTE_DS4}, {2750, 4, NOTE_AS4},
+  {3000, 2, NOTE_G4},
+  // Second phrase - higher
+  {4000, 3, NOTE_D5}, {4500, 3, NOTE_D5}, {5000, 3, NOTE_D5},
+  {5500, 4, NOTE_DS5}, {5750, 4, NOTE_AS4},
+  {6000, 1, NOTE_FS4}, {6500, 0, NOTE_DS4}, {6750, 4, NOTE_AS4},
+  {7000, 2, NOTE_G4},
+  // Repeat main theme
+  {8000, 2, NOTE_G4}, {8500, 2, NOTE_G4}, {9000, 2, NOTE_G4},
+  {9500, 0, NOTE_DS4}, {9750, 4, NOTE_AS4},
+  {10000, 2, NOTE_G4}, {10500, 0, NOTE_DS4}, {10750, 4, NOTE_AS4},
+  {11000, 2, NOTE_G4},
+  // Marching section
+  {12000, 2, NOTE_G4}, {12250, 2, NOTE_G4},
+  {12500, 3, NOTE_A4}, {12750, 2, NOTE_G4}, {13000, 2, NOTE_G4},
+  {13250, 3, NOTE_AS4}, {13500, 3, NOTE_A4},
+  {14000, 2, NOTE_G4}, {14250, 2, NOTE_G4},
+  {14500, 3, NOTE_A4}, {14750, 2, NOTE_G4},
+  {15000, 0, NOTE_D4}, {15500, 0, NOTE_D4},
+  // Final DUN DUN DUN
+  {16000, 2, NOTE_G4}, {16500, 2, NOTE_G4}, {17000, 2, NOTE_G4},
+  {17500, 0, NOTE_DS4}, {17750, 4, NOTE_AS4},
+  {18000, 2, NOTE_G4},
+};
+#define SONG10_LEN 45
+
+// Song 12: Pink Panther Theme (Medium)
+const RhythmNote PROGMEM song11_notes[] = {
+  // The sneaky chromatic walk
+  {0, 1, NOTE_DS4}, {350, 2, NOTE_E4}, {1000, 2, NOTE_G4},
+  {1350, 3, NOTE_GS4}, {2000, 1, NOTE_DS4}, {2350, 2, NOTE_E4},
+  {2700, 2, NOTE_G4}, {3050, 3, NOTE_GS4},
+  // Ascending phrase
+  {3500, 3, NOTE_A4}, {3700, 4, NOTE_AS4}, {3900, 3, NOTE_A4},
+  {4100, 2, NOTE_GS4}, {4300, 2, NOTE_G4}, {4700, 1, NOTE_E4},
+  // Repeat main motif
+  {5200, 1, NOTE_DS4}, {5550, 2, NOTE_E4}, {6200, 2, NOTE_G4},
+  {6550, 3, NOTE_GS4}, {7200, 1, NOTE_DS4}, {7550, 2, NOTE_E4},
+  {7900, 2, NOTE_G4}, {8250, 3, NOTE_GS4},
+  // High section
+  {8700, 3, NOTE_C5}, {8900, 4, NOTE_D5}, {9100, 4, NOTE_DS5},
+  {9400, 3, NOTE_C5}, {9700, 2, NOTE_G4}, {10000, 1, NOTE_E4},
+  // Sneaky walk down
+  {10500, 3, NOTE_A4}, {10700, 2, NOTE_GS4}, {10900, 2, NOTE_G4},
+  {11200, 1, NOTE_E4}, {11500, 1, NOTE_DS4}, {11800, 0, NOTE_D4},
+  // Return to main theme
+  {12300, 1, NOTE_DS4}, {12650, 2, NOTE_E4}, {13300, 2, NOTE_G4},
+  {13650, 3, NOTE_GS4}, {14000, 3, NOTE_A4}, {14200, 4, NOTE_AS4},
+  {14400, 3, NOTE_A4}, {14600, 2, NOTE_GS4},
+  // Ending
+  {15000, 2, NOTE_G4}, {15300, 1, NOTE_E4}, {15700, 1, NOTE_DS4},
+  {16200, 2, NOTE_E4},
+};
+#define SONG11_LEN 46
+
 // Song metadata
-const uint8_t NUM_SONGS = 7;
+const uint8_t NUM_SONGS = 12;
 
 const uint8_t songLengths[] PROGMEM = {
   SONG0_LEN, SONG1_LEN, SONG2_LEN, SONG3_LEN,
-  SONG4_LEN, SONG5_LEN, SONG6_LEN
+  SONG4_LEN, SONG5_LEN, SONG6_LEN, SONG7_LEN,
+  SONG8_LEN, SONG9_LEN, SONG10_LEN, SONG11_LEN
 };
 
 // Pointers to song arrays (stored in a regular array of PROGMEM pointers)
 const RhythmNote* const songData[] PROGMEM = {
   song0_notes, song1_notes, song2_notes, song3_notes,
-  song4_notes, song5_notes, song6_notes
+  song4_notes, song5_notes, song6_notes, song7_notes,
+  song8_notes, song9_notes, song10_notes, song11_notes
 };
 
 // Song names in PROGMEM
@@ -567,9 +719,15 @@ const char sName3[] PROGMEM = "Crazy Train";
 const char sName4[] PROGMEM = "Thunderstruck";
 const char sName5[] PROGMEM = "Fire & Flames";
 const char sName6[] PROGMEM = "Free Bird";
+const char sName7[] PROGMEM = "Pirates";
+const char sName8[] PROGMEM = "Jaws";
+const char sName9[] PROGMEM = "Rickroll";
+const char sName10[] PROGMEM = "Imperial March";
+const char sName11[] PROGMEM = "Pink Panther";
 
 const char* const songNames[] PROGMEM = {
-  sName0, sName1, sName2, sName3, sName4, sName5, sName6
+  sName0, sName1, sName2, sName3, sName4, sName5, sName6,
+  sName7, sName8, sName9, sName10, sName11
 };
 
 // Difficulty strings in PROGMEM
@@ -580,9 +738,15 @@ const char sDiff3[] PROGMEM = "Med-Hard";
 const char sDiff4[] PROGMEM = "Hard";
 const char sDiff5[] PROGMEM = "Extreme";
 const char sDiff6[] PROGMEM = "Hard";
+const char sDiff7[] PROGMEM = "Med-Hard";
+const char sDiff8[] PROGMEM = "Easy";
+const char sDiff9[] PROGMEM = "Medium";
+const char sDiff10[] PROGMEM = "Medium";
+const char sDiff11[] PROGMEM = "Medium";
 
 const char* const songDiffs[] PROGMEM = {
-  sDiff0, sDiff1, sDiff2, sDiff3, sDiff4, sDiff5, sDiff6
+  sDiff0, sDiff1, sDiff2, sDiff3, sDiff4, sDiff5, sDiff6,
+  sDiff7, sDiff8, sDiff9, sDiff10, sDiff11
 };
 
 /* ======================= RHYTHM GAME STATE ======================= */

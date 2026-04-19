@@ -2,6 +2,7 @@
 #include <MD_Parola.h>
 #include <MD_MAX72xx.h>
 #include <SPI.h>
+#include "RhythmSongs.h"
 
 /* ======================= PIN SETUP ======================= */
 
@@ -49,7 +50,10 @@ enum GameState {
   VICTORY,
   HERO_STATE,
   HERO_END,
-  ULTRA_STATE
+  ULTRA_STATE,
+  RHYTHM_SELECT,
+  RHYTHM_PLAYING,
+  RHYTHM_END
 };
 
 enum GameMode {
@@ -125,6 +129,37 @@ unsigned long heroEndStart = 0;
 float ultraRecordedDistance = -1.0;
 unsigned long ultraStartTime = 0;
 const unsigned long ULTRA_SHOW_TIME = 4000;
+
+/* ======================= RHYTHM GAME ======================= */
+
+const int RHYTHM_SONG_COUNT   = 7;
+const int APPROACH_TIME        = 1200;  // ms - LED starts fading in this early
+const int PERFECT_WINDOW       = 50;    // ±ms
+const int GREAT_WINDOW         = 100;
+const int GOOD_WINDOW          = 200;
+const int NOTE_PLAY_DURATION   = 80;    // ms buzzer plays each note
+const unsigned long RHYTHM_END_SHOW = 5000;
+
+int  rhythmSongIdx     = 0;
+int  rhythmNoteIdx     = 0;
+unsigned long rhythmStart = 0;
+int  rhythmScore       = 0;
+int  rhythmCombo       = 0;
+int  rhythmMaxCombo    = 0;
+int  rhythmPerfects    = 0;
+int  rhythmGreats      = 0;
+int  rhythmGoods       = 0;
+int  rhythmMisses      = 0;
+int  rhythmMultiplier  = 1;
+unsigned long rhythmEndStart = 0;
+bool rhythmNoteActive[5]  = {false};  // which lanes currently have active notes
+int  rhythmNoteLane[300];             // which lane each note index maps to (for hit tracking)
+bool rhythmNoteHit[300];              // was this note already hit?
+unsigned long rhythmLastBuzz = 0;
+
+// Scroll state for song select
+unsigned long rhythmSelectScroll = 0;
+bool rhythmSelectScrollDone = false;
 
 /* ======================= COUNTDOWN ======================= */
 
@@ -622,6 +657,315 @@ void showUltraDistance() {
   p2Matrix.displayText(distBuf, PA_CENTER, 0, 0, PA_PRINT, PA_NO_EFFECT);
 }
 
+/* ======================= RHYTHM GAME ENGINE ======================= */
+
+// Software PWM for non-PWM pins (P1_LED pins: 13,11,9,7,5)
+// Pin 7 is not hardware PWM on Mega, so we use this for all 5 for consistency
+void softAnalogWrite(int pin, int val) {
+  // For PWM-capable pins, use analogWrite directly
+  // Pins 2-13, 44-46 are PWM on Mega
+  if (pin == 13 || pin == 11 || pin == 9 || pin == 5) {
+    analogWrite(pin, val);
+  } else {
+    // Pin 7: digital threshold
+    digitalWrite(pin, val > 127 ? HIGH : LOW);
+  }
+}
+
+void startRhythmSelect() {
+  gameMode  = MODE_NONE;
+  musicMode = MUSIC_NONE;
+  noTone(SPEAKER);
+  allLEDsOff();
+  setPlayer2Normal();
+
+  rhythmSongIdx = 0;
+  rhythmSelectScrollDone = false;
+  rhythmSelectScroll = 0;
+
+  gameState = RHYTHM_SELECT;
+}
+
+void showRhythmSongName() {
+  char nameBuf[20];
+  char diffBuf[12];
+
+  strcpy_P(nameBuf, (char*)pgm_read_ptr(&songNames[rhythmSongIdx]));
+  strcpy_P(diffBuf, (char*)pgm_read_ptr(&songDiffs[rhythmSongIdx]));
+
+  p1Matrix.displayClear();
+  p2Matrix.displayClear();
+
+  if (!rhythmSelectScrollDone) {
+    p1Matrix.displayScroll(nameBuf, PA_CENTER, PA_SCROLL_LEFT, 60);
+    p2Matrix.displayText(diffBuf, PA_CENTER, 0, 0, PA_PRINT, PA_NO_EFFECT);
+    rhythmSelectScroll = millis();
+    rhythmSelectScrollDone = true;
+  }
+}
+
+void startRhythmGame() {
+  allLEDsOff();
+  noTone(SPEAKER);
+
+  rhythmNoteIdx   = 0;
+  rhythmScore     = 0;
+  rhythmCombo     = 0;
+  rhythmMaxCombo  = 0;
+  rhythmPerfects  = 0;
+  rhythmGreats    = 0;
+  rhythmGoods     = 0;
+  rhythmMisses    = 0;
+  rhythmMultiplier = 1;
+  rhythmLastBuzz  = 0;
+
+  for (int i = 0; i < 5; i++) rhythmNoteActive[i] = false;
+
+  int songLen;
+  getSongData(rhythmSongIdx, songLen);
+  for (int i = 0; i < songLen && i < 300; i++) {
+    rhythmNoteHit[i] = false;
+  }
+
+  // Countdown: flash all LEDs 3 times
+  for (int blink = 0; blink < 3; blink++) {
+    for (int i = 0; i < 5; i++) digitalWrite(P1_LED[i], HIGH);
+    tone(SPEAKER, 800, 150);
+    delay(300);
+    for (int i = 0; i < 5; i++) digitalWrite(P1_LED[i], LOW);
+    delay(300);
+  }
+  // Final high beep = GO
+  tone(SPEAKER, 1200, 200);
+  delay(200);
+  noTone(SPEAKER);
+
+  allLEDsOff();
+  rhythmStart = millis();
+  gameState = RHYTHM_PLAYING;
+}
+
+void updateRhythmLEDs() {
+  int songLen;
+  const RNote* song = getSongData(rhythmSongIdx, songLen);
+  unsigned long now = millis() - rhythmStart;
+
+  // Clear active tracking
+  for (int i = 0; i < 5; i++) rhythmNoteActive[i] = false;
+
+  // For each LED, find the closest upcoming note and set brightness
+  for (int lane = 0; lane < 5; lane++) {
+    int bestIdx = -1;
+    long bestDelta = 999999;
+
+    // Find the nearest un-hit note in this lane
+    for (int i = 0; i < songLen; i++) {
+      if (rhythmNoteHit[i]) continue;
+
+      RNote note;
+      memcpy_P(&note, &song[i], sizeof(RNote));
+
+      if (note.lane != lane) continue;
+
+      long delta = (long)note.time - (long)now;
+      // Only consider notes within approach window and slightly past
+      if (delta > -(long)GOOD_WINDOW && delta < (long)APPROACH_TIME) {
+        if (abs(delta) < abs(bestDelta)) {
+          bestDelta = delta;
+          bestIdx = i;
+        }
+      }
+    }
+
+    if (bestIdx >= 0 && bestDelta <= (long)APPROACH_TIME) {
+      rhythmNoteActive[lane] = true;
+
+      // Calculate brightness: 0 at APPROACH_TIME, 255 at time=0
+      int brightness;
+      if (bestDelta <= 0) {
+        brightness = 255;  // full brightness at hit time and slightly after
+      } else {
+        brightness = map(bestDelta, APPROACH_TIME, 0, 10, 255);
+        brightness = constrain(brightness, 10, 255);
+      }
+
+      softAnalogWrite(P1_LED[lane], brightness);
+    } else {
+      softAnalogWrite(P1_LED[lane], 0);
+    }
+  }
+}
+
+void updateRhythmBuzzer() {
+  int songLen;
+  const RNote* song = getSongData(rhythmSongIdx, songLen);
+  unsigned long now = millis() - rhythmStart;
+
+  // Auto-play notes as they pass (so you hear the song)
+  for (int i = 0; i < songLen; i++) {
+    RNote note;
+    memcpy_P(&note, &song[i], sizeof(RNote));
+
+    long delta = (long)note.time - (long)now;
+    if (delta >= 0 && delta < 15 && millis() != rhythmLastBuzz) {
+      tone(SPEAKER, note.freq, NOTE_PLAY_DURATION);
+      rhythmLastBuzz = millis();
+      break;
+    }
+  }
+}
+
+void updateRhythmCombo() {
+  if (rhythmCombo >= 50) rhythmMultiplier = 4;
+  else if (rhythmCombo >= 25) rhythmMultiplier = 3;
+  else if (rhythmCombo >= 10) rhythmMultiplier = 2;
+  else rhythmMultiplier = 1;
+
+  if (rhythmCombo > rhythmMaxCombo) rhythmMaxCombo = rhythmCombo;
+}
+
+void handleRhythmInput() {
+  int songLen;
+  const RNote* song = getSongData(rhythmSongIdx, songLen);
+  unsigned long now = millis() - rhythmStart;
+
+  for (int i = 0; i < 5; i++) {
+    bool pressed = !digitalRead(P1_BTN[i]);
+
+    if (pressed && millis() - lastPress[i] > DEBOUNCE) {
+      lastPress[i] = millis();
+
+      // Find the closest un-hit note in this lane
+      int bestIdx = -1;
+      long bestDelta = 999999;
+
+      for (int n = 0; n < songLen; n++) {
+        if (rhythmNoteHit[n]) continue;
+
+        RNote note;
+        memcpy_P(&note, &song[n], sizeof(RNote));
+
+        if (note.lane != i) continue;
+
+        long delta = abs((long)note.time - (long)now);
+        if (delta < bestDelta) {
+          bestDelta = delta;
+          bestIdx = n;
+        }
+      }
+
+      if (bestIdx >= 0 && bestDelta <= GOOD_WINDOW) {
+        rhythmNoteHit[bestIdx] = true;
+
+        if (bestDelta <= PERFECT_WINDOW) {
+          rhythmScore += 100 * rhythmMultiplier;
+          rhythmPerfects++;
+          rhythmCombo++;
+          tone(SPEAKER, 1600, 30); // satisfying hit sound
+        } else if (bestDelta <= GREAT_WINDOW) {
+          rhythmScore += 75 * rhythmMultiplier;
+          rhythmGreats++;
+          rhythmCombo++;
+          tone(SPEAKER, 1200, 30);
+        } else {
+          rhythmScore += 50 * rhythmMultiplier;
+          rhythmGoods++;
+          rhythmCombo++;
+          tone(SPEAKER, 800, 30);
+        }
+
+        updateRhythmCombo();
+
+        // Flash the LED bright on hit
+        softAnalogWrite(P1_LED[i], 255);
+      } else {
+        // Wrong button or no note nearby = miss
+        rhythmMisses++;
+        rhythmCombo = 0;
+        rhythmMultiplier = 1;
+        tone(SPEAKER, 150, 80); // bad sound
+      }
+    }
+  }
+}
+
+void checkRhythmMisses() {
+  int songLen;
+  const RNote* song = getSongData(rhythmSongIdx, songLen);
+  unsigned long now = millis() - rhythmStart;
+
+  // Check for notes that passed without being hit
+  for (int i = rhythmNoteIdx; i < songLen; i++) {
+    RNote note;
+    memcpy_P(&note, &song[i], sizeof(RNote));
+
+    if ((long)now - (long)note.time > (long)GOOD_WINDOW && !rhythmNoteHit[i]) {
+      rhythmNoteHit[i] = true;
+      rhythmMisses++;
+      rhythmCombo = 0;
+      rhythmMultiplier = 1;
+      // Advance the minimum index so we don't re-check old notes
+      if (i == rhythmNoteIdx) rhythmNoteIdx++;
+    }
+
+    // Don't look too far ahead
+    if ((long)note.time - (long)now > (long)APPROACH_TIME) break;
+  }
+}
+
+bool isRhythmSongDone() {
+  int songLen;
+  const RNote* song = getSongData(rhythmSongIdx, songLen);
+  unsigned long now = millis() - rhythmStart;
+
+  // Song is done when all notes have passed
+  RNote lastNote;
+  memcpy_P(&lastNote, &song[songLen - 1], sizeof(RNote));
+
+  return now > lastNote.time + 1000;  // 1s after last note
+}
+
+void startRhythmEnd() {
+  allLEDsOff();
+  noTone(SPEAKER);
+  rhythmEndStart = millis();
+
+  // Calculate grade
+  int songLen;
+  getSongData(rhythmSongIdx, songLen);
+
+  int totalNotes = songLen;
+  int hitNotes = rhythmPerfects + rhythmGreats + rhythmGoods;
+  int pct = (totalNotes > 0) ? (hitNotes * 100 / totalNotes) : 0;
+
+  // Show score on matrix
+  char scoreBuf[12];
+  itoa(rhythmScore, scoreBuf, 10);
+
+  char gradeBuf[8];
+  if (pct >= 95)      strcpy(gradeBuf, "S");
+  else if (pct >= 85) strcpy(gradeBuf, "A");
+  else if (pct >= 70) strcpy(gradeBuf, "B");
+  else if (pct >= 50) strcpy(gradeBuf, "C");
+  else                strcpy(gradeBuf, "F");
+
+  p1Matrix.displayClear();
+  p2Matrix.displayClear();
+  p1Matrix.displayScroll(scoreBuf, PA_CENTER, PA_SCROLL_LEFT, 80);
+  p2Matrix.displayScroll(gradeBuf, PA_CENTER, PA_SCROLL_LEFT, 80);
+
+  // Play victory or fail jingle
+  if (pct >= 50) {
+    musicMode = MUSIC_WIN;
+    musicIndex = 0;
+    musicNext = 0;
+  } else {
+    tone(SPEAKER, 200, 500);
+  }
+
+  gameState = RHYTHM_END;
+}
+
 /*SETUP*/
 
 void setup() {
@@ -702,6 +1046,12 @@ void loop() {
 
     if (digitalRead(ULTRA_BTN) == LOW) {
       startUltraState();
+    }
+
+    // RHYTHM MODE: Press SOLO + START together
+    if (digitalRead(SOLO_BTN) == LOW && digitalRead(START_BTN) == LOW) {
+      delay(200);  // debounce combo press
+      startRhythmSelect();
     }
   }
 
@@ -976,6 +1326,130 @@ void loop() {
   }
 
   /* ===== BONUS END SCORE ANIMATION ===== */
+
+  /* ===== RHYTHM SELECT ===== */
+  if (gameState == RHYTHM_SELECT) {
+    if (!rhythmSelectScrollDone) {
+      showRhythmSongName();
+    }
+
+    bool scrolling = p1Matrix.displayAnimate();
+
+    // Show difficulty on p2
+    char diffBuf[12];
+    strcpy_P(diffBuf, (char*)pgm_read_ptr(&songDiffs[rhythmSongIdx]));
+    p2Matrix.displayClear();
+    p2Matrix.displayText(diffBuf, PA_CENTER, 0, 0, PA_PRINT, PA_NO_EFFECT);
+    p2Matrix.displayAnimate();
+
+    // Cycle through songs with P1 buttons
+    // Left button (P1_BTN[0]) = previous
+    if (!digitalRead(P1_BTN[0]) && millis() - lastPress[0] > 300) {
+      lastPress[0] = millis();
+      rhythmSongIdx = (rhythmSongIdx + RHYTHM_SONG_COUNT - 1) % RHYTHM_SONG_COUNT;
+      rhythmSelectScrollDone = false;
+      tone(SPEAKER, 600, 50);
+    }
+
+    // Right button (P1_BTN[4]) = next
+    if (!digitalRead(P1_BTN[4]) && millis() - lastPress[4] > 300) {
+      lastPress[4] = millis();
+      rhythmSongIdx = (rhythmSongIdx + 1) % RHYTHM_SONG_COUNT;
+      rhythmSelectScrollDone = false;
+      tone(SPEAKER, 600, 50);
+    }
+
+    // Middle button (P1_BTN[2]) = select/play
+    if (!digitalRead(P1_BTN[2]) && millis() - lastPress[2] > 300) {
+      lastPress[2] = millis();
+      tone(SPEAKER, 1000, 100);
+      delay(300);
+      startRhythmGame();
+    }
+
+    // Show selection LEDs: light up button 0, 2, 4 dimly as hints
+    softAnalogWrite(P1_LED[0], 40);
+    softAnalogWrite(P1_LED[2], 80);
+    softAnalogWrite(P1_LED[4], 40);
+
+    // HERO_BTN to go back
+    if (digitalRead(HERO_BTN) == LOW) {
+      allLEDsOff();
+      noTone(SPEAKER);
+      musicMode = MUSIC_HP;
+      musicIndex = 0;
+      musicNext = 0;
+      gameState = WAITING;
+    }
+  }
+
+  /* ===== RHYTHM PLAYING ===== */
+  if (gameState == RHYTHM_PLAYING) {
+    // Update LED fade-in for approaching notes
+    updateRhythmLEDs();
+
+    // Auto-play buzzer for the song
+    updateRhythmBuzzer();
+
+    // Handle button presses
+    handleRhythmInput();
+
+    // Check for missed notes
+    checkRhythmMisses();
+
+    // Show score + combo on matrices
+    char sBuf[10];
+    itoa(rhythmScore, sBuf, 10);
+
+    char cBuf[10];
+    if (rhythmCombo > 1) {
+      sprintf(cBuf, "x%d", rhythmMultiplier);
+    } else {
+      strcpy(cBuf, "");
+    }
+
+    p1Matrix.displayClear();
+    p2Matrix.displayClear();
+    p1Matrix.displayText(sBuf, PA_CENTER, 0, 0, PA_PRINT, PA_NO_EFFECT);
+    p2Matrix.displayText(cBuf, PA_CENTER, 0, 0, PA_PRINT, PA_NO_EFFECT);
+
+    // Check if song is done
+    if (isRhythmSongDone()) {
+      startRhythmEnd();
+    }
+  }
+
+  /* ===== RHYTHM END ===== */
+  if (gameState == RHYTHM_END) {
+    p1Matrix.displayAnimate();
+    p2Matrix.displayAnimate();
+
+    unsigned long elapsed = millis() - rhythmEndStart;
+
+    // After 3s, show detailed stats
+    if (elapsed > 3000 && elapsed < 6000) {
+      char statBuf[16];
+      sprintf(statBuf, "P%d G%d", rhythmPerfects, rhythmGreats);
+
+      char comboBuf[12];
+      sprintf(comboBuf, "MC%d", rhythmMaxCombo);
+
+      p1Matrix.displayClear();
+      p2Matrix.displayClear();
+      p1Matrix.displayText(statBuf, PA_CENTER, 0, 0, PA_PRINT, PA_NO_EFFECT);
+      p2Matrix.displayText(comboBuf, PA_CENTER, 0, 0, PA_PRINT, PA_NO_EFFECT);
+    }
+
+    // After 6s, return to song select
+    if (elapsed >= 6000) {
+      allLEDsOff();
+      noTone(SPEAKER);
+      musicMode = MUSIC_NONE;
+      startRhythmSelect();
+    }
+  }
+
+  /* ===== ORIGINAL BONUS END SCORE ANIMATION ===== */
   if (gameMode == MODE_SOLO && bonusEndAnimating) {
     p1Matrix.displayAnimate();
     p2Matrix.displayAnimate();

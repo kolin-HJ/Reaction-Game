@@ -2,7 +2,7 @@
 #include <MD_Parola.h>
 #include <MD_MAX72xx.h>
 #include <SPI.h>
-#include "RhythmSongs.h"
+#include <avr/pgmspace.h>
 
 /* ======================= PIN SETUP ======================= */
 
@@ -130,52 +130,7 @@ float ultraRecordedDistance = -1.0;
 unsigned long ultraStartTime = 0;
 const unsigned long ULTRA_SHOW_TIME = 4000;
 
-/* ======================= RHYTHM GAME ======================= */
-
-const int RHYTHM_SONG_COUNT   = 7;
-const int APPROACH_TIME        = 1200;  // ms - LED starts fading in this early
-const int PERFECT_WINDOW       = 50;    // ±ms
-const int GREAT_WINDOW         = 100;
-const int GOOD_WINDOW          = 200;
-const int NOTE_PLAY_DURATION   = 80;    // ms buzzer plays each note
-const unsigned long RHYTHM_END_SHOW = 5000;
-
-int  rhythmSongIdx     = 0;
-int  rhythmNoteIdx     = 0;
-unsigned long rhythmStart = 0;
-int  rhythmScore       = 0;
-int  rhythmCombo       = 0;
-int  rhythmMaxCombo    = 0;
-int  rhythmPerfects    = 0;
-int  rhythmGreats      = 0;
-int  rhythmGoods       = 0;
-int  rhythmMisses      = 0;
-int  rhythmMultiplier  = 1;
-unsigned long rhythmEndStart = 0;
-bool rhythmNoteActive[5]  = {false};  // which lanes currently have active notes
-int  rhythmNoteLane[300];             // which lane each note index maps to (for hit tracking)
-bool rhythmNoteHit[300];              // was this note already hit?
-unsigned long rhythmLastBuzz = 0;
-
-// Scroll state for song select
-unsigned long rhythmSelectScroll = 0;
-bool rhythmSelectScrollDone = false;
-
-/* ======================= COUNTDOWN ======================= */
-
-unsigned long cdNext = 0;
-int cdBlinkCount = 0;
-bool cdOn = false;
-
-/* ======================= MUSIC ======================= */
-
-enum MusicMode { MUSIC_HP, MUSIC_TETRIS, MUSIC_WIN, MUSIC_NONE };
-MusicMode musicMode = MUSIC_HP;
-
-unsigned long musicNext = 0;
-int musicIndex = 0;
-
-/* ======================= NOTES ======================= */
+/* ======================= NOTES (background music) ======================= */
 
 #define NOTE_D4 294
 #define NOTE_E4 330
@@ -189,13 +144,13 @@ int musicIndex = 0;
 #define NOTE_G5 784
 #define NOTE_B4 494
 #define NOTE_C6 1047
-#define NOTE_GS4 415   // G#4 / Ab4
-#define NOTE_CS4 277   // C#4 / Db4
-#define NOTE_DS5 622   // D#5 / Eb5
-#define NOTE_CS5 554   // C#5 / Db5
-#define NOTE_F5  698   // F5
-#define NOTE_A5  880   // A5
-#define NOTE_GS5 831   // G#5 / Ab5
+#define NOTE_GS4 415
+#define NOTE_CS4 277
+#define NOTE_DS5 622
+#define NOTE_CS5 554
+#define NOTE_F5  698
+#define NOTE_A5  880
+#define NOTE_GS5 831
 #define REST 0
 
 /* ======================= MUSIC DATA ======================= */
@@ -337,6 +292,864 @@ int wMel[] = {NOTE_C5, NOTE_E5, NOTE_G5, NOTE_C6};
 int wDur[] = {4, 4, 4, 2};
 const int W_LEN = 4;
 
+/* ======================= RHYTHM SONGS (inlined from RhythmSongs.h) ======================= */
+
+typedef struct {
+  uint16_t time;   // ms from song start
+  uint8_t  lane;   // 0-4 (maps to P1 buttons/LEDs)
+  uint16_t freq;   // buzzer frequency (Hz)
+} RNote;
+
+/* ============================= NOTE FREQUENCIES ============================= */
+
+#define N_E2  82
+#define N_A2  110
+#define N_B2  123
+#define N_C3  131
+#define N_D3  147
+#define N_E3  165
+#define N_F3  175
+#define N_FS3 185
+#define N_G3  196
+#define N_GS3 208
+#define N_A3  220
+#define N_AS3 233
+#define N_B3  247
+#define N_C4  262
+#define N_CS4_R 277
+#define N_D4  294
+#define N_DS4 311
+#define N_E4  330
+#define N_F4_R  349
+#define N_FS4 370
+#define N_G4  392
+#define N_GS4_R 415
+#define N_A4  440
+#define N_AS4_R 466
+#define N_B4  494
+#define N_C5  523
+#define N_CS5 554
+#define N_D5  587
+#define N_DS5_R 622
+#define N_E5  659
+#define N_F5_R  698
+#define N_FS5 740
+#define N_G5  784
+#define N_GS5_R 831
+#define N_A5  880
+#define N_AS5 932
+#define N_B5  988
+#define N_C6_R  1047
+#define N_D6  1175
+#define N_E6  1319
+#define N_F6  1397
+#define N_FS6 1480
+#define N_G6  1568
+#define N_A6  1760
+
+/* =============================================================================
+ * SONG 1: SEVEN NATION ARMY - The White Stripes
+ * Difficulty: EASY
+ * =============================================================================*/
+
+const RNote song_7nation[] PROGMEM = {
+  // --- Riff 1 ---
+  {   0, 2, N_E3},
+  { 500, 2, N_E3},
+  { 750, 3, N_G3},
+  {1000, 2, N_E3},
+  {1250, 1, N_D3},
+  {1750, 0, N_C3},
+  {2500, 1, N_B2},
+
+  // --- Riff 2 ---
+  {4000, 2, N_E3},
+  {4500, 2, N_E3},
+  {4750, 3, N_G3},
+  {5000, 2, N_E3},
+  {5250, 1, N_D3},
+  {5750, 0, N_C3},
+  {6250, 1, N_D3},
+  {6500, 0, N_C3},
+  {7000, 1, N_B2},
+
+  // --- Riff 3 ---
+  {8000, 2, N_E3},
+  {8500, 2, N_E3},
+  {8750, 3, N_G3},
+  {9000, 2, N_E3},
+  {9250, 1, N_D3},
+  {9750, 0, N_C3},
+  {10500, 1, N_B2},
+
+  // --- Riff 4 ---
+  {12000, 2, N_E3},
+  {12500, 2, N_E3},
+  {12750, 3, N_G3},
+  {13000, 2, N_E3},
+  {13250, 1, N_D3},
+  {13750, 0, N_C3},
+  {14250, 1, N_D3},
+  {14500, 0, N_C3},
+  {15000, 1, N_B2},
+
+  // --- Riff 5 (with octave up) ---
+  {16000, 2, N_E4},
+  {16500, 2, N_E4},
+  {16750, 3, N_G4},
+  {17000, 2, N_E4},
+  {17250, 1, N_D4},
+  {17750, 0, N_C4},
+  {18500, 1, N_B3},
+
+  // --- Riff 6 ---
+  {20000, 2, N_E4},
+  {20500, 2, N_E4},
+  {20750, 3, N_G4},
+  {21000, 2, N_E4},
+  {21250, 1, N_D4},
+  {21750, 0, N_C4},
+  {22250, 1, N_D4},
+  {22500, 0, N_C4},
+  {23000, 1, N_B3},
+
+  // --- End riff ---
+  {24000, 2, N_E3},
+  {24500, 2, N_E3},
+  {24750, 3, N_G3},
+  {25000, 2, N_E3},
+  {25250, 1, N_D3},
+  {25750, 0, N_C3},
+  {26500, 1, N_B2},
+};
+const int song_7nation_len = sizeof(song_7nation) / sizeof(RNote);
+
+/* =============================================================================
+ * SONG 2: SWEET CHILD O' MINE - Guns N' Roses
+ * Difficulty: MEDIUM
+ * =============================================================================*/
+
+const RNote song_sweetChild[] PROGMEM = {
+  // --- Riff pattern 1 (D chord shape) ---
+  {   0, 1, N_D5},
+  { 200, 2, N_D4},
+  { 400, 4, N_A4},
+  { 600, 3, N_G4},
+  { 800, 4, N_B4},
+  {1000, 3, N_G4},
+  {1200, 4, N_A4},
+  {1400, 3, N_G4},
+
+  // --- Riff pattern 2 ---
+  {1600, 1, N_D5},
+  {1800, 2, N_D4},
+  {2000, 4, N_A4},
+  {2200, 3, N_G4},
+  {2400, 4, N_B4},
+  {2600, 3, N_G4},
+  {2800, 4, N_A4},
+  {3000, 3, N_G4},
+
+  // --- Riff pattern 3 (C shape - shifted) ---
+  {3200, 0, N_C5},
+  {3400, 2, N_D4},
+  {3600, 4, N_A4},
+  {3800, 3, N_G4},
+  {4000, 4, N_B4},
+  {4200, 3, N_G4},
+  {4400, 4, N_A4},
+  {4600, 3, N_G4},
+
+  // --- Riff pattern 4 ---
+  {4800, 0, N_C5},
+  {5000, 2, N_D4},
+  {5200, 4, N_A4},
+  {5400, 3, N_G4},
+  {5600, 4, N_B4},
+  {5800, 3, N_G4},
+  {6000, 4, N_A4},
+  {6200, 3, N_G4},
+
+  // --- Riff pattern 5 (G shape) ---
+  {6400, 3, N_G5},
+  {6600, 2, N_D4},
+  {6800, 4, N_A4},
+  {7000, 3, N_G4},
+  {7200, 4, N_B4},
+  {7400, 3, N_G4},
+  {7600, 4, N_A4},
+  {7800, 3, N_G4},
+
+  // --- Riff pattern 6 ---
+  {8000, 3, N_G5},
+  {8200, 2, N_D4},
+  {8400, 4, N_A4},
+  {8600, 3, N_G4},
+  {8800, 4, N_B4},
+  {9000, 3, N_G4},
+  {9200, 4, N_A4},
+  {9400, 3, N_G4},
+
+  // --- Repeat D pattern ---
+  { 9600, 1, N_D5},
+  { 9800, 2, N_D4},
+  {10000, 4, N_A4},
+  {10200, 3, N_G4},
+  {10400, 4, N_B4},
+  {10600, 3, N_G4},
+  {10800, 4, N_A4},
+  {11000, 3, N_G4},
+
+  {11200, 1, N_D5},
+  {11400, 2, N_D4},
+  {11600, 4, N_A4},
+  {11800, 3, N_G4},
+  {12000, 4, N_B4},
+  {12200, 3, N_G4},
+  {12400, 4, N_A4},
+  {12600, 3, N_G4},
+
+  // --- C pattern again ---
+  {12800, 0, N_C5},
+  {13000, 2, N_D4},
+  {13200, 4, N_A4},
+  {13400, 3, N_G4},
+  {13600, 4, N_B4},
+  {13800, 3, N_G4},
+  {14000, 4, N_A4},
+  {14200, 3, N_G4},
+};
+const int song_sweetChild_len = sizeof(song_sweetChild) / sizeof(RNote);
+
+/* =============================================================================
+ * SONG 3: ENTER SANDMAN - Metallica
+ * Difficulty: MEDIUM
+ * =============================================================================*/
+
+const RNote song_sandman[] PROGMEM = {
+  // --- Intro: open E power chords ---
+  {   0, 0, N_E3},
+  { 250, 0, N_E3},
+  { 750, 0, N_E3},
+
+  // --- Main riff ---
+  {1500, 0, N_E3},
+  {1750, 0, N_E3},
+  {2000, 2, N_G3},
+  {2125, 2, N_G3},
+  {2250, 3, N_A3},
+  {2500, 3, N_GS3},
+
+  {3000, 0, N_E3},
+  {3250, 0, N_E3},
+  {3500, 2, N_G3},
+  {3625, 2, N_G3},
+  {3750, 3, N_A3},
+  {4000, 3, N_GS3},
+
+  // --- Riff 2 ---
+  {4500, 0, N_E3},
+  {4750, 0, N_E3},
+  {5000, 2, N_G3},
+  {5125, 2, N_G3},
+  {5250, 3, N_A3},
+  {5500, 2, N_G3},
+  {5750, 1, N_FS3},
+  {6000, 2, N_G3},
+  {6250, 1, N_FS3},
+  {6500, 0, N_E3},
+
+  // --- Repeat main ---
+  {7500, 0, N_E3},
+  {7750, 0, N_E3},
+  {8000, 2, N_G3},
+  {8125, 2, N_G3},
+  {8250, 3, N_A3},
+  {8500, 3, N_GS3},
+
+  {9000, 0, N_E3},
+  {9250, 0, N_E3},
+  {9500, 2, N_G3},
+  {9625, 2, N_G3},
+  {9750, 3, N_A3},
+  {10000, 3, N_GS3},
+
+  // --- Bridge ascending ---
+  {10500, 0, N_E3},
+  {10625, 1, N_F3},
+  {10750, 1, N_FS3},
+  {10875, 2, N_G3},
+  {11000, 2, N_GS3},
+  {11125, 3, N_A3},
+  {11250, 3, N_AS3},
+  {11375, 4, N_B3},
+
+  // --- Power chord hits ---
+  {12000, 0, N_E3},
+  {12500, 2, N_G3},
+  {13000, 3, N_A3},
+  {13500, 4, N_B3},
+  {14000, 0, N_E3},
+  {14250, 0, N_E3},
+  {14500, 2, N_G3},
+  {14750, 3, N_A3},
+
+  // --- Final riff repeat ---
+  {15500, 0, N_E3},
+  {15750, 0, N_E3},
+  {16000, 2, N_G3},
+  {16125, 2, N_G3},
+  {16250, 3, N_A3},
+  {16500, 3, N_GS3},
+
+  {17000, 0, N_E3},
+  {17250, 0, N_E3},
+  {17500, 2, N_G3},
+  {17625, 2, N_G3},
+  {17750, 3, N_A3},
+  {18000, 2, N_G3},
+  {18250, 1, N_FS3},
+  {18500, 2, N_G3},
+  {18750, 1, N_FS3},
+  {19000, 0, N_E3},
+
+  // --- Ending hits ---
+  {20000, 0, N_E3},
+  {20500, 0, N_E3},
+  {21000, 0, N_E3},
+};
+const int song_sandman_len = sizeof(song_sandman) / sizeof(RNote);
+
+/* =============================================================================
+ * SONG 4: CRAZY TRAIN - Ozzy Osbourne / Randy Rhoads
+ * Difficulty: MEDIUM-HARD
+ * =============================================================================*/
+
+const RNote song_crazy[] PROGMEM = {
+  // --- Intro: rapid FS picking ---
+  {   0, 1, N_FS4},
+  { 120, 3, N_A4},
+  { 240, 1, N_FS4},
+  { 360, 4, N_B4},
+  { 480, 1, N_FS4},
+  { 600, 3, N_A4},
+  { 720, 1, N_FS4},
+  { 840, 0, N_E4},
+
+  {1000, 1, N_FS4},
+  {1120, 3, N_A4},
+  {1240, 1, N_FS4},
+  {1360, 4, N_B4},
+  {1480, 1, N_FS4},
+  {1600, 3, N_A4},
+  {1720, 1, N_FS4},
+  {1840, 0, N_E4},
+
+  // --- Main riff ---
+  {2000, 1, N_FS4},
+  {2120, 3, N_A4},
+  {2240, 1, N_FS4},
+  {2360, 0, N_E4},
+  {2480, 1, N_FS4},
+  {2600, 2, N_G4},
+  {2720, 3, N_A4},
+  {2840, 2, N_G4},
+
+  {3000, 1, N_FS4},
+  {3120, 3, N_A4},
+  {3240, 1, N_FS4},
+  {3360, 0, N_E4},
+  {3480, 1, N_FS4},
+  {3600, 2, N_G4},
+  {3720, 3, N_A4},
+  {3840, 4, N_B4},
+
+  // --- Higher section ---
+  {4000, 3, N_A4},
+  {4120, 4, N_B4},
+  {4240, 3, N_A4},
+  {4360, 2, N_G4},
+  {4480, 3, N_A4},
+  {4600, 4, N_B4},
+  {4720, 3, N_A4},
+  {4840, 2, N_G4},
+
+  // --- Riff repeat ---
+  {5000, 1, N_FS4},
+  {5120, 3, N_A4},
+  {5240, 1, N_FS4},
+  {5360, 4, N_B4},
+  {5480, 1, N_FS4},
+  {5600, 3, N_A4},
+  {5720, 1, N_FS4},
+  {5840, 0, N_E4},
+
+  {6000, 1, N_FS4},
+  {6120, 3, N_A4},
+  {6240, 1, N_FS4},
+  {6360, 4, N_B4},
+  {6480, 1, N_FS4},
+  {6600, 3, N_A4},
+  {6720, 1, N_FS4},
+  {6840, 0, N_E4},
+
+  // --- Main riff 2 ---
+  {7000, 1, N_FS4},
+  {7120, 3, N_A4},
+  {7240, 1, N_FS4},
+  {7360, 0, N_E4},
+  {7480, 1, N_FS4},
+  {7600, 2, N_G4},
+  {7720, 3, N_A4},
+  {7840, 2, N_G4},
+
+  {8000, 1, N_FS4},
+  {8120, 3, N_A4},
+  {8240, 1, N_FS4},
+  {8360, 0, N_E4},
+  {8480, 1, N_FS4},
+  {8600, 2, N_G4},
+  {8720, 3, N_A4},
+  {8840, 4, N_B4},
+
+  // --- End descend ---
+  {9000, 4, N_B4},
+  {9200, 3, N_A4},
+  {9400, 2, N_G4},
+  {9600, 1, N_FS4},
+  {9800, 0, N_E4},
+  {10000, 1, N_FS4},
+};
+const int song_crazy_len = sizeof(song_crazy) / sizeof(RNote);
+
+/* =============================================================================
+ * SONG 5: THUNDERSTRUCK - AC/DC
+ * Difficulty: HARD
+ * =============================================================================*/
+
+const RNote song_thunder[] PROGMEM = {
+  // --- The iconic rapid B-string riff ---
+  {   0, 4, N_B4},
+  { 100, 3, N_A4},
+  { 200, 4, N_B4},
+  { 300, 0, N_E4},
+  { 400, 4, N_B4},
+  { 500, 3, N_A4},
+  { 600, 4, N_B4},
+  { 700, 0, N_E4},
+
+  { 800, 4, N_B4},
+  { 900, 3, N_A4},
+  {1000, 4, N_B4},
+  {1100, 2, N_G4},
+  {1200, 4, N_B4},
+  {1300, 3, N_A4},
+  {1400, 4, N_B4},
+  {1500, 2, N_G4},
+
+  {1600, 4, N_B4},
+  {1700, 1, N_FS4},
+  {1800, 4, N_B4},
+  {1900, 0, N_E4},
+  {2000, 4, N_B4},
+  {2100, 1, N_FS4},
+  {2200, 4, N_B4},
+  {2300, 0, N_E4},
+
+  // --- Pattern 2: stepping up ---
+  {2400, 4, N_B4},
+  {2500, 0, N_E4},
+  {2600, 4, N_B4},
+  {2700, 1, N_FS4},
+  {2800, 4, N_B4},
+  {2900, 2, N_G4},
+  {3000, 4, N_B4},
+  {3100, 3, N_A4},
+
+  {3200, 4, N_B4},
+  {3300, 3, N_A4},
+  {3400, 4, N_B4},
+  {3500, 0, N_E4},
+  {3600, 4, N_B4},
+  {3700, 3, N_A4},
+  {3800, 4, N_B4},
+  {3900, 0, N_E4},
+
+  // --- Pattern 3: repeat base ---
+  {4000, 4, N_B4},
+  {4100, 3, N_A4},
+  {4200, 4, N_B4},
+  {4300, 0, N_E4},
+  {4400, 4, N_B4},
+  {4500, 3, N_A4},
+  {4600, 4, N_B4},
+  {4700, 0, N_E4},
+
+  {4800, 4, N_B4},
+  {4900, 3, N_A4},
+  {5000, 4, N_B4},
+  {5100, 2, N_G4},
+  {5200, 4, N_B4},
+  {5300, 3, N_A4},
+  {5400, 4, N_B4},
+  {5500, 2, N_G4},
+
+  // --- Pattern 4: different intervals ---
+  {5600, 4, N_B4},
+  {5700, 1, N_FS4},
+  {5800, 4, N_B4},
+  {5900, 2, N_G4},
+  {6000, 4, N_B4},
+  {6100, 3, N_A4},
+  {6200, 4, N_B4},
+  {6300, 2, N_G4},
+
+  {6400, 4, N_B4},
+  {6500, 0, N_E4},
+  {6600, 4, N_B4},
+  {6700, 1, N_FS4},
+  {6800, 4, N_B4},
+  {6900, 2, N_G4},
+  {7000, 4, N_B4},
+  {7100, 3, N_A4},
+
+  // --- Climax run ---
+  {7200, 0, N_E4},
+  {7300, 1, N_FS4},
+  {7400, 2, N_G4},
+  {7500, 3, N_A4},
+  {7600, 4, N_B4},
+  {7700, 3, N_A4},
+  {7800, 2, N_G4},
+  {7900, 1, N_FS4},
+  {8000, 0, N_E4},
+  {8100, 4, N_B4},
+  {8200, 4, N_B4},
+  {8400, 4, N_B4},
+};
+const int song_thunder_len = sizeof(song_thunder) / sizeof(RNote);
+
+/* =============================================================================
+ * SONG 6: THROUGH THE FIRE AND FLAMES - DragonForce
+ * Difficulty: EXTREME
+ * =============================================================================*/
+
+const RNote song_fire[] PROGMEM = {
+  // --- Rapid-fire intro shred ---
+  {   0, 0, N_E5},
+  {  75, 2, N_G5},
+  { 150, 4, N_B5},
+  { 225, 2, N_G5},
+  { 300, 0, N_E5},
+  { 375, 1, N_FS5},
+  { 450, 2, N_G5},
+  { 525, 3, N_A5},
+  { 600, 4, N_B5},
+  { 675, 3, N_A5},
+  { 750, 2, N_G5},
+  { 825, 1, N_FS5},
+
+  // --- Descending run ---
+  { 900, 4, N_B5},
+  { 975, 3, N_A5},
+  {1050, 2, N_G5},
+  {1125, 1, N_FS5},
+  {1200, 0, N_E5},
+  {1275, 1, N_FS5},
+  {1350, 2, N_G5},
+  {1425, 3, N_A5},
+
+  // --- Triplet pattern ---
+  {1500, 0, N_E5},
+  {1575, 2, N_G5},
+  {1650, 4, N_B5},
+  {1725, 0, N_E5},
+  {1800, 2, N_G5},
+  {1875, 4, N_B5},
+  {1950, 3, N_A5},
+  {2025, 1, N_FS5},
+  {2100, 0, N_E5},
+
+  // --- Power chord section ---
+  {2400, 0, N_E4},
+  {2550, 2, N_G4},
+  {2700, 3, N_A4},
+  {2850, 0, N_E4},
+  {3000, 4, N_B4},
+  {3150, 3, N_A4},
+  {3300, 2, N_G4},
+  {3450, 0, N_E4},
+
+  // --- Shred section 2 ---
+  {3600, 0, N_E5},
+  {3675, 1, N_FS5},
+  {3750, 2, N_G5},
+  {3825, 3, N_A5},
+  {3900, 4, N_B5},
+  {3975, 3, N_A5},
+  {4050, 4, N_B5},
+  {4125, 2, N_G5},
+  {4200, 0, N_E5},
+  {4275, 2, N_G5},
+  {4350, 4, N_B5},
+  {4425, 2, N_G5},
+
+  // --- Sweep pattern ---
+  {4500, 0, N_E5},
+  {4562, 1, N_FS5},
+  {4625, 2, N_G5},
+  {4687, 3, N_A5},
+  {4750, 4, N_B5},
+  {4812, 3, N_A5},
+  {4875, 2, N_G5},
+  {4937, 1, N_FS5},
+  {5000, 0, N_E5},
+  {5062, 1, N_FS5},
+  {5125, 2, N_G5},
+  {5187, 3, N_A5},
+  {5250, 4, N_B5},
+  {5375, 4, N_B5},
+
+  // --- Galloping rhythm ---
+  {5500, 0, N_E4},
+  {5575, 0, N_E4},
+  {5700, 2, N_G4},
+  {5775, 2, N_G4},
+  {5900, 3, N_A4},
+  {5975, 3, N_A4},
+  {6100, 4, N_B4},
+  {6175, 4, N_B4},
+  {6300, 3, N_A4},
+  {6375, 3, N_A4},
+  {6500, 2, N_G4},
+  {6575, 2, N_G4},
+
+  // --- Final shred burst ---
+  {6700, 0, N_E5},
+  {6775, 1, N_FS5},
+  {6850, 2, N_G5},
+  {6925, 3, N_A5},
+  {7000, 4, N_B5},
+  {7075, 4, N_B5},
+  {7150, 3, N_A5},
+  {7225, 2, N_G5},
+  {7300, 1, N_FS5},
+  {7375, 0, N_E5},
+  {7450, 0, N_E5},
+  {7600, 0, N_E4},
+};
+const int song_fire_len = sizeof(song_fire) / sizeof(RNote);
+
+/* =============================================================================
+ * SONG 7: FREE BIRD - Lynyrd Skynyrd
+ * Difficulty: HARD
+ * =============================================================================*/
+
+const RNote song_freebird[] PROGMEM = {
+  // --- Slow intro: the melody line ---
+  {   0, 2, N_G4},
+  { 500, 3, N_A4},
+  {1000, 4, N_B4},
+  {1500, 3, N_A4},
+  {2000, 2, N_G4},
+
+  {3000, 1, N_FS4},
+  {3500, 2, N_G4},
+  {4000, 3, N_A4},
+  {4500, 2, N_G4},
+  {5000, 1, N_FS4},
+
+  {6000, 0, N_E4},
+  {6500, 1, N_FS4},
+  {7000, 2, N_G4},
+  {7500, 1, N_FS4},
+  {8000, 0, N_E4},
+
+  // --- Chord transition ---
+  {9000, 2, N_G4},
+  {9250, 3, N_A4},
+  {9500, 4, N_B4},
+  {10000, 2, N_G4},
+  {10500, 3, N_A4},
+  {11000, 4, N_B4},
+
+  // --- THE SOLO BEGINS! Speed ramps up ---
+  {12000, 2, N_G5},
+  {12200, 3, N_A5},
+  {12400, 4, N_B5},
+  {12600, 3, N_A5},
+  {12800, 2, N_G5},
+  {13000, 1, N_FS5},
+  {13200, 0, N_E5},
+  {13400, 1, N_FS5},
+
+  // --- Solo section 2 ---
+  {13600, 2, N_G5},
+  {13750, 3, N_A5},
+  {13900, 4, N_B5},
+  {14050, 3, N_A5},
+  {14200, 2, N_G5},
+  {14350, 1, N_FS5},
+  {14500, 2, N_G5},
+  {14650, 3, N_A5},
+
+  // --- Solo section 3: faster ---
+  {14800, 0, N_E5},
+  {14925, 1, N_FS5},
+  {15050, 2, N_G5},
+  {15175, 3, N_A5},
+  {15300, 4, N_B5},
+  {15425, 3, N_A5},
+  {15550, 2, N_G5},
+  {15675, 1, N_FS5},
+
+  // --- Solo section 4: blazing ---
+  {15800, 0, N_E5},
+  {15900, 1, N_FS5},
+  {16000, 2, N_G5},
+  {16100, 3, N_A5},
+  {16200, 4, N_B5},
+  {16300, 3, N_A5},
+  {16400, 4, N_B5},
+  {16500, 2, N_G5},
+  {16600, 0, N_E5},
+  {16700, 2, N_G5},
+  {16800, 4, N_B5},
+  {16900, 3, N_A5},
+
+  // --- Pentatonic run ---
+  {17000, 0, N_E5},
+  {17100, 2, N_G5},
+  {17200, 3, N_A5},
+  {17300, 4, N_B5},
+  {17400, 2, N_G5},
+  {17500, 0, N_E5},
+  {17600, 1, N_FS5},
+  {17700, 2, N_G5},
+
+  // --- Final blazing section ---
+  {17800, 3, N_A5},
+  {17875, 4, N_B5},
+  {17950, 3, N_A5},
+  {18025, 2, N_G5},
+  {18100, 1, N_FS5},
+  {18175, 0, N_E5},
+  {18250, 1, N_FS5},
+  {18325, 2, N_G5},
+  {18400, 3, N_A5},
+  {18475, 4, N_B5},
+  {18550, 4, N_B5},
+
+  // --- Big ending ---
+  {19000, 2, N_G4},
+  {19500, 2, N_G4},
+  {20000, 0, N_E4},
+};
+const int song_freebird_len = sizeof(song_freebird) / sizeof(RNote);
+
+/* =============================================================================
+ * SONG MENU DATA
+ * =============================================================================*/
+
+const char songName0[] PROGMEM = "7 NATION ARMY";
+const char songName1[] PROGMEM = "SWEET CHILD";
+const char songName2[] PROGMEM = "SANDMAN";
+const char songName3[] PROGMEM = "CRAZY TRAIN";
+const char songName4[] PROGMEM = "THUNDERSTRUCK";
+const char songName5[] PROGMEM = "FIRE+FLAMES";
+const char songName6[] PROGMEM = "FREE BIRD";
+
+const char* const songNames[] PROGMEM = {
+  songName0, songName1, songName2, songName3,
+  songName4, songName5, songName6
+};
+
+const char songDiff0[] PROGMEM = "EASY";
+const char songDiff1[] PROGMEM = "MEDIUM";
+const char songDiff2[] PROGMEM = "MEDIUM";
+const char songDiff3[] PROGMEM = "MED-HARD";
+const char songDiff4[] PROGMEM = "HARD";
+const char songDiff5[] PROGMEM = "EXTREME";
+const char songDiff6[] PROGMEM = "HARD";
+
+const char* const songDiffs[] PROGMEM = {
+  songDiff0, songDiff1, songDiff2, songDiff3,
+  songDiff4, songDiff5, songDiff6
+};
+
+// Accessor: returns pointer to the PROGMEM note array and its length
+inline const RNote* getSongData(int idx, int &len) {
+  switch (idx) {
+    case 0: len = song_7nation_len;    return song_7nation;
+    case 1: len = song_sweetChild_len; return song_sweetChild;
+    case 2: len = song_sandman_len;    return song_sandman;
+    case 3: len = song_crazy_len;      return song_crazy;
+    case 4: len = song_thunder_len;    return song_thunder;
+    case 5: len = song_fire_len;       return song_fire;
+    case 6: len = song_freebird_len;   return song_freebird;
+    default: len = 0; return 0;
+  }
+}
+
+/* ======================= RHYTHM GAME GLOBALS ======================= */
+
+const int RHYTHM_SONG_COUNT   = 7;
+const int APPROACH_TIME        = 1200;  // ms - note highway look-ahead
+const int PERFECT_WINDOW       = 50;    // +/-ms
+const int GREAT_WINDOW         = 100;
+const int GOOD_WINDOW          = 200;
+const int NOTE_PLAY_DURATION   = 80;    // ms buzzer plays each note
+const unsigned long RHYTHM_END_SHOW = 5000;
+
+int  rhythmSongIdx     = 0;
+int  rhythmNoteIdx     = 0;
+int  rhythmBuzzIdx     = 0;
+unsigned long rhythmStart = 0;
+int  rhythmScore       = 0;
+int  rhythmCombo       = 0;
+int  rhythmMaxCombo    = 0;
+int  rhythmPerfects    = 0;
+int  rhythmGreats      = 0;
+int  rhythmGoods       = 0;
+int  rhythmMisses      = 0;
+int  rhythmMultiplier  = 1;
+unsigned long rhythmEndStart = 0;
+bool rhythmNoteActive[5]  = {false};
+bool rhythmNoteHit[300];
+
+// Scroll state for song select
+bool rhythmSelectScrollDone = false;
+
+// Guitar Hero lane column positions on the 32-column matrix (cols 0-31)
+static const uint8_t LANE_COLS[5] = {1, 8, 15, 22, 29};
+
+/* ======================= WAITING STATE FLAG ======================= */
+
+bool waitingInitDone = false;
+
+/* ======================= SONG PREVIEW GLOBALS ======================= */
+
+static unsigned long previewHoverStart = 0;
+static unsigned long previewSongStart  = 0;
+static bool  previewPlaying = false;
+static int   previewNoteIdx = 0;
+#define PREVIEW_DELAY    900UL
+#define PREVIEW_DURATION 5000UL
+
+/* ======================= COUNTDOWN ======================= */
+
+unsigned long cdNext = 0;
+int cdBlinkCount = 0;
+bool cdOn = false;
+
+/* ======================= MUSIC ENGINE STATE ======================= */
+
+enum MusicMode { MUSIC_HP, MUSIC_TETRIS, MUSIC_WIN, MUSIC_NONE };
+MusicMode musicMode = MUSIC_HP;
+
+unsigned long musicNext = 0;
+int musicIndex = 0;
+
 /* ======================= HELPERS ======================= */
 
 void startBonusEndAnimation() {
@@ -434,7 +1247,7 @@ bool isSoloActive(int idx) {
 int randomSoloLED() {
   int r;
   do {
-    r = random(0, 10);   // 0-4 P1, 5-9 P2
+    r = random(0, 10);
   } while (isSoloActive(r));
   return r;
 }
@@ -565,6 +1378,7 @@ void startHeroGame() {
 
   setPlayer2Normal();
   startHeroRound();
+  waitingInitDone = false;
   gameState = HERO_STATE;
 }
 
@@ -608,7 +1422,7 @@ void updateHeroInputs() {
   }
 }
 
-/*ULTRA HELPERS*/
+/* ======================= ULTRA HELPERS ======================= */
 
 float readUltraCM() {
   digitalWrite(ULTRA_TRIG, LOW);
@@ -637,6 +1451,7 @@ void startUltraState() {
   if (ultraRecordedDistance >= 0) tone(SPEAKER, 1400, 150);
   else tone(SPEAKER, 180, 250);
 
+  waitingInitDone = false;
   gameState = ULTRA_STATE;
 }
 
@@ -657,20 +1472,298 @@ void showUltraDistance() {
   p2Matrix.displayText(distBuf, PA_CENTER, 0, 0, PA_PRINT, PA_NO_EFFECT);
 }
 
-/* ======================= RHYTHM GAME ENGINE ======================= */
+/* ======================= SOFTWARE PWM ======================= */
 
-// Software PWM for non-PWM pins (P1_LED pins: 13,11,9,7,5)
-// Pin 7 is not hardware PWM on Mega, so we use this for all 5 for consistency
 void softAnalogWrite(int pin, int val) {
-  // For PWM-capable pins, use analogWrite directly
-  // Pins 2-13, 44-46 are PWM on Mega
   if (pin == 13 || pin == 11 || pin == 9 || pin == 5) {
     analogWrite(pin, val);
   } else {
-    // Pin 7: digital threshold
     digitalWrite(pin, val > 127 ? HIGH : LOW);
   }
 }
+
+/* ======================= GUITAR HERO HIGHWAY ======================= */
+
+// P1 matrix is flipped UD+LR (180 degrees), so invert both axes when writing pixels
+static void p1Pixel(MD_MAX72XX* mx, uint8_t row, uint8_t col, bool on) {
+  if (row > 7 || col > 31) return;
+  mx->setPoint(7 - row, 31 - col, on);
+}
+
+void drawRhythmHighway() {
+  MD_MAX72XX* mx = p1Matrix.getGraphicObject();
+  if (!mx) return;
+  mx->clear();
+
+  int songLen;
+  const RNote* song = getSongData(rhythmSongIdx, songLen);
+  unsigned long now = millis() - rhythmStart;
+
+  // Permanent hit-zone markers at row 7 for all 5 lanes
+  for (int l = 0; l < 5; l++) p1Pixel(mx, 7, LANE_COLS[l], true);
+
+  // Draw approaching notes as pixels falling toward row 7
+  for (int i = rhythmNoteIdx; i < songLen; i++) {
+    if (rhythmNoteHit[i]) continue;
+    RNote note;
+    memcpy_P(&note, &song[i], sizeof(RNote));
+    long delta = (long)note.time - (long)now;
+    if (delta > (long)APPROACH_TIME) break;
+    if (delta < -(long)GOOD_WINDOW) continue;
+    if (note.lane >= 5) continue;
+    int row = (delta <= 0) ? 7 : (int)map(delta, 0, APPROACH_TIME, 7, 0);
+    row = constrain(row, 0, 7);
+    p1Pixel(mx, row, LANE_COLS[note.lane], true);
+  }
+}
+
+/* ======================= RHYTHM GAME ENGINE ======================= */
+
+void updateRhythmLEDs() {
+  int songLen;
+  const RNote* song = getSongData(rhythmSongIdx, songLen);
+  unsigned long now = millis() - rhythmStart;
+
+  for (int i = 0; i < 5; i++) rhythmNoteActive[i] = false;
+
+  for (int lane = 0; lane < 5; lane++) {
+    int bestIdx = -1;
+    long bestDelta = 999999;
+
+    for (int i = 0; i < songLen; i++) {
+      if (rhythmNoteHit[i]) continue;
+
+      RNote note;
+      memcpy_P(&note, &song[i], sizeof(RNote));
+
+      if (note.lane != lane) continue;
+
+      long delta = (long)note.time - (long)now;
+      if (delta > -(long)GOOD_WINDOW && delta < (long)APPROACH_TIME) {
+        if (abs(delta) < abs(bestDelta)) {
+          bestDelta = delta;
+          bestIdx = i;
+        }
+      }
+    }
+
+    if (bestIdx >= 0 && bestDelta <= (long)APPROACH_TIME) {
+      rhythmNoteActive[lane] = true;
+
+      int brightness;
+      if (bestDelta <= 0) {
+        brightness = 255;
+      } else {
+        brightness = map(bestDelta, APPROACH_TIME, 0, 10, 255);
+        brightness = constrain(brightness, 10, 255);
+      }
+
+      softAnalogWrite(P1_LED[lane], brightness);
+    } else {
+      softAnalogWrite(P1_LED[lane], 0);
+    }
+  }
+}
+
+void updateRhythmBuzzer() {
+  int songLen;
+  const RNote* song = getSongData(rhythmSongIdx, songLen);
+  unsigned long now = millis() - rhythmStart;
+
+  while (rhythmBuzzIdx < songLen) {
+    RNote note;
+    memcpy_P(&note, &song[rhythmBuzzIdx], sizeof(RNote));
+    if ((long)note.time > (long)now) break;
+    if (now - (unsigned long)note.time < 50UL) {
+      tone(SPEAKER, note.freq, NOTE_PLAY_DURATION);
+    }
+    rhythmBuzzIdx++;
+  }
+}
+
+void updateRhythmCombo() {
+  if (rhythmCombo >= 50) rhythmMultiplier = 4;
+  else if (rhythmCombo >= 25) rhythmMultiplier = 3;
+  else if (rhythmCombo >= 10) rhythmMultiplier = 2;
+  else rhythmMultiplier = 1;
+
+  if (rhythmCombo > rhythmMaxCombo) rhythmMaxCombo = rhythmCombo;
+}
+
+void handleRhythmInput() {
+  int songLen;
+  const RNote* song = getSongData(rhythmSongIdx, songLen);
+  unsigned long now = millis() - rhythmStart;
+
+  for (int i = 0; i < 5; i++) {
+    bool pressed = !digitalRead(P1_BTN[i]);
+
+    if (pressed && millis() - lastPress[i] > DEBOUNCE) {
+      lastPress[i] = millis();
+
+      int bestIdx = -1;
+      long bestDelta = 999999;
+
+      for (int n = 0; n < songLen; n++) {
+        if (rhythmNoteHit[n]) continue;
+
+        RNote note;
+        memcpy_P(&note, &song[n], sizeof(RNote));
+
+        if (note.lane != i) continue;
+
+        long delta = abs((long)note.time - (long)now);
+        if (delta < bestDelta) {
+          bestDelta = delta;
+          bestIdx = n;
+        }
+      }
+
+      if (bestIdx >= 0 && bestDelta <= GOOD_WINDOW) {
+        rhythmNoteHit[bestIdx] = true;
+
+        RNote hitNote;
+        memcpy_P(&hitNote, &song[bestIdx], sizeof(RNote));
+
+        if (bestDelta <= PERFECT_WINDOW) {
+          rhythmScore += 100 * rhythmMultiplier;
+          rhythmPerfects++;
+          rhythmCombo++;
+          tone(SPEAKER, hitNote.freq, 60);
+        } else if (bestDelta <= GREAT_WINDOW) {
+          rhythmScore += 75 * rhythmMultiplier;
+          rhythmGreats++;
+          rhythmCombo++;
+          tone(SPEAKER, hitNote.freq, 60);
+        } else {
+          rhythmScore += 50 * rhythmMultiplier;
+          rhythmGoods++;
+          rhythmCombo++;
+          tone(SPEAKER, hitNote.freq, 60);
+        }
+
+        updateRhythmCombo();
+
+        softAnalogWrite(P1_LED[i], 255);
+      } else {
+        rhythmMisses++;
+        rhythmCombo = 0;
+        rhythmMultiplier = 1;
+        tone(SPEAKER, 150, 80);
+      }
+    }
+  }
+}
+
+void checkRhythmMisses() {
+  int songLen;
+  const RNote* song = getSongData(rhythmSongIdx, songLen);
+  unsigned long now = millis() - rhythmStart;
+
+  for (int i = rhythmNoteIdx; i < songLen; i++) {
+    RNote note;
+    memcpy_P(&note, &song[i], sizeof(RNote));
+
+    if ((long)now - (long)note.time > (long)GOOD_WINDOW && !rhythmNoteHit[i]) {
+      rhythmNoteHit[i] = true;
+      rhythmMisses++;
+      rhythmCombo = 0;
+      rhythmMultiplier = 1;
+      if (i == rhythmNoteIdx) rhythmNoteIdx++;
+    }
+
+    if ((long)note.time - (long)now > (long)APPROACH_TIME) break;
+  }
+}
+
+bool isRhythmSongDone() {
+  int songLen;
+  const RNote* song = getSongData(rhythmSongIdx, songLen);
+  unsigned long now = millis() - rhythmStart;
+
+  RNote lastNote;
+  memcpy_P(&lastNote, &song[songLen - 1], sizeof(RNote));
+
+  return now > lastNote.time + 1000;
+}
+
+void startRhythmEnd() {
+  allLEDsOff();
+  noTone(SPEAKER);
+  rhythmEndStart = millis();
+
+  int songLen;
+  getSongData(rhythmSongIdx, songLen);
+
+  int totalNotes = songLen;
+  int hitNotes = rhythmPerfects + rhythmGreats + rhythmGoods;
+  int pct = (totalNotes > 0) ? (hitNotes * 100 / totalNotes) : 0;
+
+  char scoreBuf[12];
+  itoa(rhythmScore, scoreBuf, 10);
+
+  char gradeBuf[8];
+  if (pct >= 95)      strcpy(gradeBuf, "S");
+  else if (pct >= 85) strcpy(gradeBuf, "A");
+  else if (pct >= 70) strcpy(gradeBuf, "B");
+  else if (pct >= 50) strcpy(gradeBuf, "C");
+  else                strcpy(gradeBuf, "F");
+
+  p1Matrix.displayClear();
+  p2Matrix.displayClear();
+  p1Matrix.displayScroll(scoreBuf, PA_CENTER, PA_SCROLL_LEFT, 80);
+  p2Matrix.displayScroll(gradeBuf, PA_CENTER, PA_SCROLL_LEFT, 80);
+
+  if (pct >= 50) {
+    musicMode = MUSIC_WIN;
+    musicIndex = 0;
+    musicNext = 0;
+  } else {
+    tone(SPEAKER, 200, 500);
+  }
+
+  gameState = RHYTHM_END;
+}
+
+/* ======================= SONG PREVIEW ======================= */
+
+void resetPreview() {
+  previewPlaying = false;
+  previewNoteIdx = 0;
+  previewHoverStart = millis();
+  noTone(SPEAKER);
+}
+
+void updatePreview() {
+  unsigned long now = millis();
+  if (!previewPlaying) {
+    if (now - previewHoverStart > PREVIEW_DELAY) {
+      previewPlaying = true;
+      previewSongStart = now;
+      previewNoteIdx = 0;
+    }
+    return;
+  }
+  unsigned long elapsed = now - previewSongStart;
+  if (elapsed > PREVIEW_DURATION) {
+    previewSongStart = now;
+    previewNoteIdx = 0;
+    elapsed = 0;
+    noTone(SPEAKER);
+  }
+  int songLen;
+  const RNote* song = getSongData(rhythmSongIdx, songLen);
+  while (previewNoteIdx < songLen) {
+    RNote note;
+    memcpy_P(&note, &song[previewNoteIdx], sizeof(RNote));
+    if (note.time > PREVIEW_DURATION) { previewNoteIdx = songLen; break; }
+    if (note.time > elapsed) break;
+    tone(SPEAKER, note.freq, 90);
+    previewNoteIdx++;
+  }
+}
+
+/* ======================= RHYTHM SELECT/GAME START ======================= */
 
 void startRhythmSelect() {
   gameMode  = MODE_NONE;
@@ -681,27 +1774,11 @@ void startRhythmSelect() {
 
   rhythmSongIdx = 0;
   rhythmSelectScrollDone = false;
-  rhythmSelectScroll = 0;
 
+  waitingInitDone = false;
   gameState = RHYTHM_SELECT;
-}
 
-void showRhythmSongName() {
-  char nameBuf[20];
-  char diffBuf[12];
-
-  strcpy_P(nameBuf, (char*)pgm_read_ptr(&songNames[rhythmSongIdx]));
-  strcpy_P(diffBuf, (char*)pgm_read_ptr(&songDiffs[rhythmSongIdx]));
-
-  p1Matrix.displayClear();
-  p2Matrix.displayClear();
-
-  if (!rhythmSelectScrollDone) {
-    p1Matrix.displayScroll(nameBuf, PA_CENTER, PA_SCROLL_LEFT, 60);
-    p2Matrix.displayText(diffBuf, PA_CENTER, 0, 0, PA_PRINT, PA_NO_EFFECT);
-    rhythmSelectScroll = millis();
-    rhythmSelectScrollDone = true;
-  }
+  resetPreview();
 }
 
 void startRhythmGame() {
@@ -709,6 +1786,7 @@ void startRhythmGame() {
   noTone(SPEAKER);
 
   rhythmNoteIdx   = 0;
+  rhythmBuzzIdx   = 0;
   rhythmScore     = 0;
   rhythmCombo     = 0;
   rhythmMaxCombo  = 0;
@@ -717,7 +1795,6 @@ void startRhythmGame() {
   rhythmGoods     = 0;
   rhythmMisses    = 0;
   rhythmMultiplier = 1;
-  rhythmLastBuzz  = 0;
 
   for (int i = 0; i < 5; i++) rhythmNoteActive[i] = false;
 
@@ -745,228 +1822,7 @@ void startRhythmGame() {
   gameState = RHYTHM_PLAYING;
 }
 
-void updateRhythmLEDs() {
-  int songLen;
-  const RNote* song = getSongData(rhythmSongIdx, songLen);
-  unsigned long now = millis() - rhythmStart;
-
-  // Clear active tracking
-  for (int i = 0; i < 5; i++) rhythmNoteActive[i] = false;
-
-  // For each LED, find the closest upcoming note and set brightness
-  for (int lane = 0; lane < 5; lane++) {
-    int bestIdx = -1;
-    long bestDelta = 999999;
-
-    // Find the nearest un-hit note in this lane
-    for (int i = 0; i < songLen; i++) {
-      if (rhythmNoteHit[i]) continue;
-
-      RNote note;
-      memcpy_P(&note, &song[i], sizeof(RNote));
-
-      if (note.lane != lane) continue;
-
-      long delta = (long)note.time - (long)now;
-      // Only consider notes within approach window and slightly past
-      if (delta > -(long)GOOD_WINDOW && delta < (long)APPROACH_TIME) {
-        if (abs(delta) < abs(bestDelta)) {
-          bestDelta = delta;
-          bestIdx = i;
-        }
-      }
-    }
-
-    if (bestIdx >= 0 && bestDelta <= (long)APPROACH_TIME) {
-      rhythmNoteActive[lane] = true;
-
-      // Calculate brightness: 0 at APPROACH_TIME, 255 at time=0
-      int brightness;
-      if (bestDelta <= 0) {
-        brightness = 255;  // full brightness at hit time and slightly after
-      } else {
-        brightness = map(bestDelta, APPROACH_TIME, 0, 10, 255);
-        brightness = constrain(brightness, 10, 255);
-      }
-
-      softAnalogWrite(P1_LED[lane], brightness);
-    } else {
-      softAnalogWrite(P1_LED[lane], 0);
-    }
-  }
-}
-
-void updateRhythmBuzzer() {
-  int songLen;
-  const RNote* song = getSongData(rhythmSongIdx, songLen);
-  unsigned long now = millis() - rhythmStart;
-
-  // Auto-play notes as they pass (so you hear the song)
-  for (int i = 0; i < songLen; i++) {
-    RNote note;
-    memcpy_P(&note, &song[i], sizeof(RNote));
-
-    long delta = (long)note.time - (long)now;
-    if (delta >= 0 && delta < 15 && millis() != rhythmLastBuzz) {
-      tone(SPEAKER, note.freq, NOTE_PLAY_DURATION);
-      rhythmLastBuzz = millis();
-      break;
-    }
-  }
-}
-
-void updateRhythmCombo() {
-  if (rhythmCombo >= 50) rhythmMultiplier = 4;
-  else if (rhythmCombo >= 25) rhythmMultiplier = 3;
-  else if (rhythmCombo >= 10) rhythmMultiplier = 2;
-  else rhythmMultiplier = 1;
-
-  if (rhythmCombo > rhythmMaxCombo) rhythmMaxCombo = rhythmCombo;
-}
-
-void handleRhythmInput() {
-  int songLen;
-  const RNote* song = getSongData(rhythmSongIdx, songLen);
-  unsigned long now = millis() - rhythmStart;
-
-  for (int i = 0; i < 5; i++) {
-    bool pressed = !digitalRead(P1_BTN[i]);
-
-    if (pressed && millis() - lastPress[i] > DEBOUNCE) {
-      lastPress[i] = millis();
-
-      // Find the closest un-hit note in this lane
-      int bestIdx = -1;
-      long bestDelta = 999999;
-
-      for (int n = 0; n < songLen; n++) {
-        if (rhythmNoteHit[n]) continue;
-
-        RNote note;
-        memcpy_P(&note, &song[n], sizeof(RNote));
-
-        if (note.lane != i) continue;
-
-        long delta = abs((long)note.time - (long)now);
-        if (delta < bestDelta) {
-          bestDelta = delta;
-          bestIdx = n;
-        }
-      }
-
-      if (bestIdx >= 0 && bestDelta <= GOOD_WINDOW) {
-        rhythmNoteHit[bestIdx] = true;
-
-        if (bestDelta <= PERFECT_WINDOW) {
-          rhythmScore += 100 * rhythmMultiplier;
-          rhythmPerfects++;
-          rhythmCombo++;
-          tone(SPEAKER, 1600, 30); // satisfying hit sound
-        } else if (bestDelta <= GREAT_WINDOW) {
-          rhythmScore += 75 * rhythmMultiplier;
-          rhythmGreats++;
-          rhythmCombo++;
-          tone(SPEAKER, 1200, 30);
-        } else {
-          rhythmScore += 50 * rhythmMultiplier;
-          rhythmGoods++;
-          rhythmCombo++;
-          tone(SPEAKER, 800, 30);
-        }
-
-        updateRhythmCombo();
-
-        // Flash the LED bright on hit
-        softAnalogWrite(P1_LED[i], 255);
-      } else {
-        // Wrong button or no note nearby = miss
-        rhythmMisses++;
-        rhythmCombo = 0;
-        rhythmMultiplier = 1;
-        tone(SPEAKER, 150, 80); // bad sound
-      }
-    }
-  }
-}
-
-void checkRhythmMisses() {
-  int songLen;
-  const RNote* song = getSongData(rhythmSongIdx, songLen);
-  unsigned long now = millis() - rhythmStart;
-
-  // Check for notes that passed without being hit
-  for (int i = rhythmNoteIdx; i < songLen; i++) {
-    RNote note;
-    memcpy_P(&note, &song[i], sizeof(RNote));
-
-    if ((long)now - (long)note.time > (long)GOOD_WINDOW && !rhythmNoteHit[i]) {
-      rhythmNoteHit[i] = true;
-      rhythmMisses++;
-      rhythmCombo = 0;
-      rhythmMultiplier = 1;
-      // Advance the minimum index so we don't re-check old notes
-      if (i == rhythmNoteIdx) rhythmNoteIdx++;
-    }
-
-    // Don't look too far ahead
-    if ((long)note.time - (long)now > (long)APPROACH_TIME) break;
-  }
-}
-
-bool isRhythmSongDone() {
-  int songLen;
-  const RNote* song = getSongData(rhythmSongIdx, songLen);
-  unsigned long now = millis() - rhythmStart;
-
-  // Song is done when all notes have passed
-  RNote lastNote;
-  memcpy_P(&lastNote, &song[songLen - 1], sizeof(RNote));
-
-  return now > lastNote.time + 1000;  // 1s after last note
-}
-
-void startRhythmEnd() {
-  allLEDsOff();
-  noTone(SPEAKER);
-  rhythmEndStart = millis();
-
-  // Calculate grade
-  int songLen;
-  getSongData(rhythmSongIdx, songLen);
-
-  int totalNotes = songLen;
-  int hitNotes = rhythmPerfects + rhythmGreats + rhythmGoods;
-  int pct = (totalNotes > 0) ? (hitNotes * 100 / totalNotes) : 0;
-
-  // Show score on matrix
-  char scoreBuf[12];
-  itoa(rhythmScore, scoreBuf, 10);
-
-  char gradeBuf[8];
-  if (pct >= 95)      strcpy(gradeBuf, "S");
-  else if (pct >= 85) strcpy(gradeBuf, "A");
-  else if (pct >= 70) strcpy(gradeBuf, "B");
-  else if (pct >= 50) strcpy(gradeBuf, "C");
-  else                strcpy(gradeBuf, "F");
-
-  p1Matrix.displayClear();
-  p2Matrix.displayClear();
-  p1Matrix.displayScroll(scoreBuf, PA_CENTER, PA_SCROLL_LEFT, 80);
-  p2Matrix.displayScroll(gradeBuf, PA_CENTER, PA_SCROLL_LEFT, 80);
-
-  // Play victory or fail jingle
-  if (pct >= 50) {
-    musicMode = MUSIC_WIN;
-    musicIndex = 0;
-    musicNext = 0;
-  } else {
-    tone(SPEAKER, 200, 500);
-  }
-
-  gameState = RHYTHM_END;
-}
-
-/*SETUP*/
+/* ======================= SETUP ======================= */
 
 void setup() {
   randomSeed(analogRead(A0));
@@ -1003,21 +1859,36 @@ void setup() {
   p2Matrix.setTextAlignment(PA_CENTER);
 }
 
+/* ======================= MAIN LOOP ======================= */
+
 void loop() {
   updateMusic();
-  p1Matrix.displayAnimate();
+
+  // Skip Parola animate on P1 during RHYTHM_PLAYING (we drive pixels directly)
+  if (gameState != RHYTHM_PLAYING) {
+    p1Matrix.displayAnimate();
+  }
   p2Matrix.displayAnimate();
 
-  /*WAITING MODE*/
+  /* ===== WAITING MODE ===== */
   if (gameState == WAITING) {
     musicMode = MUSIC_HP;
 
-    p1Matrix.displayClear();
-    p2Matrix.displayClear();
-    p1Matrix.displayText("0", PA_CENTER, 0, 0, PA_PRINT, PA_NO_EFFECT);
-    p2Matrix.displayText("0", PA_CENTER, 0, 0, PA_PRINT, PA_NO_EFFECT);
+    if (!waitingInitDone) {
+      waitingInitDone = true;
+      p1Matrix.displayClear();
+      p2Matrix.displayClear();
+      p1Matrix.displayScroll("SOLO . VS . HERO . ULTRA . RHYTHM", PA_CENTER, PA_SCROLL_LEFT, 55);
+      p2Matrix.displayText("READY", PA_CENTER, 0, 0, PA_PRINT, PA_NO_EFFECT);
+    }
 
-    if (digitalRead(SOLO_BTN) == LOW) {
+    // RHYTHM MODE: Press SOLO + START together — check first (more specific)
+    if (digitalRead(SOLO_BTN) == LOW && digitalRead(START_BTN) == LOW) {
+      delay(200);  // debounce combo press
+      waitingInitDone = false;
+      startRhythmSelect();
+    }
+    else if (digitalRead(SOLO_BTN) == LOW) {
       gameMode = MODE_SOLO;
       setPlayer2Normal();
       soloScore = 0;
@@ -1025,10 +1896,10 @@ void loop() {
       cdOn = false;
       cdNext = millis();
       musicMode = MUSIC_NONE;
+      waitingInitDone = false;
       gameState = COUNTDOWN;
     }
-
-    if (digitalRead(START_BTN) == LOW) {
+    else if (digitalRead(START_BTN) == LOW) {
       gameMode = MODE_VS;
       setPlayer2Rotated();
       p1Score = 0;
@@ -1037,25 +1908,20 @@ void loop() {
       cdOn = false;
       cdNext = millis();
       musicMode = MUSIC_NONE;
+      waitingInitDone = false;
       gameState = COUNTDOWN;
     }
-
-    if (digitalRead(HERO_BTN) == LOW) {
+    else if (digitalRead(HERO_BTN) == LOW) {
+      waitingInitDone = false;
       startHeroGame();
     }
-
-    if (digitalRead(ULTRA_BTN) == LOW) {
+    else if (digitalRead(ULTRA_BTN) == LOW) {
+      waitingInitDone = false;
       startUltraState();
-    }
-
-    // RHYTHM MODE: Press SOLO + START together
-    if (digitalRead(SOLO_BTN) == LOW && digitalRead(START_BTN) == LOW) {
-      delay(200);  // debounce combo press
-      startRhythmSelect();
     }
   }
 
-  /*COUNTDOWN (shared)*/
+  /* ===== COUNTDOWN (shared) ===== */
   if (gameState == COUNTDOWN) {
     if (millis() >= cdNext) {
       cdOn = !cdOn;
@@ -1090,7 +1956,7 @@ void loop() {
     }
   }
 
-  /*SOLO MODE*/
+  /* ===== SOLO MODE ===== */
   if (gameState == SOLO_PLAYING) {
     float timeLeft = 30.0 - (millis() - soloStartTime) / 1000.0;
     if (timeLeft < 0) timeLeft = 0;
@@ -1151,7 +2017,7 @@ void loop() {
     }
   }
 
-  /*BONUS COUNTDOWN*/
+  /* ===== BONUS COUNTDOWN ===== */
   if (gameState == BONUS_COUNTDOWN) {
     if (millis() >= cdNext) {
       cdOn = !cdOn;
@@ -1176,7 +2042,7 @@ void loop() {
     }
   }
 
-  /*BONUS MODE*/
+  /* ===== BONUS MODE ===== */
   if (gameState == BONUS) {
     float timeLeft = 10.0 - (millis() - bonusStartTime) / 1000.0;
     if (timeLeft < 0) timeLeft = 0;
@@ -1222,7 +2088,7 @@ void loop() {
     }
   }
 
-  /*VS MODE*/
+  /* ===== VS MODE ===== */
   if (gameState == VS_PLAYING) {
     char b1[8];
     itoa(p1Score, b1, 10);
@@ -1272,7 +2138,7 @@ void loop() {
     }
   }
 
-  /*HERO STATE*/
+  /* ===== HERO STATE ===== */
   if (gameState == HERO_STATE) {
     float timeLeft = heroRoundTimeMs() / 1000.0 - (millis() - heroRoundStart) / 1000.0;
     if (timeLeft < 0) timeLeft = 0;
@@ -1296,7 +2162,7 @@ void loop() {
     }
   }
 
-  /*HERO END*/
+  /* ===== HERO END ===== */
   if (gameState == HERO_END) {
     p1Matrix.displayAnimate();
     p2Matrix.displayAnimate();
@@ -1310,44 +2176,58 @@ void loop() {
       musicNext = 0;
 
       gameMode = MODE_NONE;
+      waitingInitDone = false;
       gameState = WAITING;
     }
   }
 
-
-  /* ULTRA STATE */
+  /* ===== ULTRA STATE ===== */
   if (gameState == ULTRA_STATE) {
     showUltraDistance();
 
     if (millis() - ultraStartTime >= ULTRA_SHOW_TIME) {
       noTone(SPEAKER);
+      waitingInitDone = false;
       gameState = WAITING;
     }
   }
 
-  /* ===== BONUS END SCORE ANIMATION ===== */
-
   /* ===== RHYTHM SELECT ===== */
   if (gameState == RHYTHM_SELECT) {
+    // Set up P1 scroll when song changes
     if (!rhythmSelectScrollDone) {
-      showRhythmSongName();
+      static char nameBuf[30];
+      char songNameTmp[20];
+      strcpy_P(songNameTmp, (char*)pgm_read_ptr(&songNames[rhythmSongIdx]));
+      sprintf(nameBuf, "%d/7 %s", rhythmSongIdx + 1, songNameTmp);
+      p1Matrix.displayClear();
+      p1Matrix.displayScroll(nameBuf, PA_CENTER, PA_SCROLL_LEFT, 55);
+      rhythmSelectScrollDone = true;
     }
 
-    bool scrolling = p1Matrix.displayAnimate();
-
-    // Show difficulty on p2
-    char diffBuf[12];
+    // Show difficulty on P2
+    static char diffBuf[12];
     strcpy_P(diffBuf, (char*)pgm_read_ptr(&songDiffs[rhythmSongIdx]));
     p2Matrix.displayClear();
     p2Matrix.displayText(diffBuf, PA_CENTER, 0, 0, PA_PRINT, PA_NO_EFFECT);
-    p2Matrix.displayAnimate();
 
-    // Cycle through songs with P1 buttons
+    // Play song preview
+    updatePreview();
+
+    // LED hints: blink left/right, steady center
+    unsigned long blinkPhase = (millis() / 400) % 2;
+    softAnalogWrite(P1_LED[0], blinkPhase ? 60 : 0);
+    softAnalogWrite(P1_LED[1], 0);
+    softAnalogWrite(P1_LED[2], 100);
+    softAnalogWrite(P1_LED[3], 0);
+    softAnalogWrite(P1_LED[4], blinkPhase ? 60 : 0);
+
     // Left button (P1_BTN[0]) = previous
     if (!digitalRead(P1_BTN[0]) && millis() - lastPress[0] > 300) {
       lastPress[0] = millis();
       rhythmSongIdx = (rhythmSongIdx + RHYTHM_SONG_COUNT - 1) % RHYTHM_SONG_COUNT;
       rhythmSelectScrollDone = false;
+      resetPreview();
       tone(SPEAKER, 600, 50);
     }
 
@@ -1356,21 +2236,18 @@ void loop() {
       lastPress[4] = millis();
       rhythmSongIdx = (rhythmSongIdx + 1) % RHYTHM_SONG_COUNT;
       rhythmSelectScrollDone = false;
+      resetPreview();
       tone(SPEAKER, 600, 50);
     }
 
     // Middle button (P1_BTN[2]) = select/play
     if (!digitalRead(P1_BTN[2]) && millis() - lastPress[2] > 300) {
       lastPress[2] = millis();
+      noTone(SPEAKER);
       tone(SPEAKER, 1000, 100);
       delay(300);
       startRhythmGame();
     }
-
-    // Show selection LEDs: light up button 0, 2, 4 dimly as hints
-    softAnalogWrite(P1_LED[0], 40);
-    softAnalogWrite(P1_LED[2], 80);
-    softAnalogWrite(P1_LED[4], 40);
 
     // HERO_BTN to go back
     if (digitalRead(HERO_BTN) == LOW) {
@@ -1379,16 +2256,17 @@ void loop() {
       musicMode = MUSIC_HP;
       musicIndex = 0;
       musicNext = 0;
+      waitingInitDone = false;
       gameState = WAITING;
     }
   }
 
   /* ===== RHYTHM PLAYING ===== */
   if (gameState == RHYTHM_PLAYING) {
-    // Update LED fade-in for approaching notes
+    // LED brightness for approaching notes
     updateRhythmLEDs();
 
-    // Auto-play buzzer for the song
+    // Auto-play song notes via buzzer
     updateRhythmBuzzer();
 
     // Handle button presses
@@ -1397,21 +2275,18 @@ void loop() {
     // Check for missed notes
     checkRhythmMisses();
 
-    // Show score + combo on matrices
-    char sBuf[10];
-    itoa(rhythmScore, sBuf, 10);
+    // Guitar Hero highway on P1 matrix (direct pixel writes, no Parola)
+    drawRhythmHighway();
 
-    char cBuf[10];
-    if (rhythmCombo > 1) {
-      sprintf(cBuf, "x%d", rhythmMultiplier);
+    // P2 shows alternating score / multiplier every 1.5s
+    char p2Buf[12];
+    if ((millis() / 1500) % 2 == 0 || rhythmMultiplier <= 1) {
+      itoa(rhythmScore, p2Buf, 10);
     } else {
-      strcpy(cBuf, "");
+      sprintf(p2Buf, "x%d", rhythmMultiplier);
     }
-
-    p1Matrix.displayClear();
     p2Matrix.displayClear();
-    p1Matrix.displayText(sBuf, PA_CENTER, 0, 0, PA_PRINT, PA_NO_EFFECT);
-    p2Matrix.displayText(cBuf, PA_CENTER, 0, 0, PA_PRINT, PA_NO_EFFECT);
+    p2Matrix.displayText(p2Buf, PA_CENTER, 0, 0, PA_PRINT, PA_NO_EFFECT);
 
     // Check if song is done
     if (isRhythmSongDone()) {
@@ -1449,7 +2324,7 @@ void loop() {
     }
   }
 
-  /* ===== ORIGINAL BONUS END SCORE ANIMATION ===== */
+  /* ===== BONUS END SCORE ANIMATION ===== */
   if (gameMode == MODE_SOLO && bonusEndAnimating) {
     p1Matrix.displayAnimate();
     p2Matrix.displayAnimate();
@@ -1475,13 +2350,14 @@ void loop() {
       musicNext  = 0;
 
       gameMode  = MODE_NONE;
+      waitingInitDone = false;
       gameState = WAITING;
     }
 
     return;
   }
 
-  /* VICTORY (SOLO + VS SAFE)*/
+  /* ===== VICTORY (SOLO + VS SAFE) ===== */
   if (gameState == VICTORY) {
 
     // --- VS MODE ---
@@ -1507,6 +2383,7 @@ void loop() {
         musicNext  = 0;
 
         gameMode  = MODE_NONE;
+        waitingInitDone = false;
         gameState = WAITING;
       }
     }
@@ -1553,6 +2430,7 @@ void loop() {
         musicNext  = 0;
 
         gameMode  = MODE_NONE;
+        waitingInitDone = false;
         gameState = WAITING;
       }
     }
